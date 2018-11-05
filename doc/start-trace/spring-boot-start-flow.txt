@@ -1,0 +1,60 @@
+[flow by debug]
+
+SpringApplication.run(sources, args):
+    run(new Object[]{source}, args)
+        new SpringApplication(sources).run(args)
+            new SpringApplication(Object... sources)
+                SpringApplication.initialize(sources)
+                    sources.addAll(sources)
+                    webEnviroment = deduceWebEnviroment():boolean -> loaded? {javax.servlet.Servlet, org.springframework.web.context.ConfigurableWebApplicationContext}
+                    setInitializers(getSpringFactoriesInstances(ApplicationContextInitializer.class))
+                    setListeners(getSpringFactoriesInstances(ApplicationListener.class))
+                    this.mainApplicationClass = deduceMainApplicationClass()
+
+            run(args):ConfigurableWebApplicationContext
+                configureHeadLessProperty() -> java.awt.headless toSring => System.setProperty
+                (listeners = getRunListeners(args)).starting
+                    new SpringApplicationRunListeners
+                        getSpringFactoriesInstances(SpringApplicationRunLlistener.class, {SpringApplication.class,String[].class}, this. args)
+                ApplicationArguments applicationArguments = new DefaultApplicatiionArguments(args) -> source = new Source(args), args = args
+                ConfigurableEnviroment enviroment = prepareEnviroment(listeners, applicationArguments)
+                    configureEnviroment(enviroment=getOrCreateEnviroment : this.enviroment || webEnviroment->new StandardServletEnviroment || new StandardEnviroment)
+                        configurePropertySource(enviroment, args)
+                        configureProfiles(enviroment, args)
+                    listeners.enviromentPrepared(enviroment)
+                        foreach -> listener.enviromentPrepared -> [EventPublishingRunListener]initialMulticaster.multicastEvent(new ApplicationEviromentPreparedEvent(application, args, enviroment))
+                        convertToStandardEnviromentIfNesessary(enviroment)
+                printedBanner = printBanner(enviroment)
+                context = createApplicationContext()
+                    Class<?> context = this.applicationContextClass | Class.forName(webEnviroment -> DEFAULT_WEB_CONTEXT_CLASS | DEFAULT_CONTEXT_CLASS)
+                        DEFAULT_WEB_CONTEXT_CLASS   : org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext
+                        DEFAULT_CONTEXT_CLASS       : org.springframework.context.annotation.AnnotationConfigApplicationContext
+                    return (ConfigurableWebApplicationContext)BeanUtils.instantiate(context.class)
+                        clazz.newInstance()
+                analyzers = new FailureAnalyzers(context)
+                prepareContext(context,enviroment,listeners, applicationArguments,printBanner)
+                    context.setEnviroment(enviroment)
+                    postProcessApplicationContext(context)
+                    applyInitializers(context)
+                    listeners.contextPrepared(context)
+                    context.getBeanFactory.registerSingleton("springApplicationArguments", applicationArguments) //Add boot specific singleton beans
+                    load(context, source = getSources())
+                    listeners.contextLoaded(context)
+                refreshContext(context)
+                    refresh(context)
+                        Assert_isInstanceOf(AbstractApplicationContext.class, context:ApplicationContext)
+                        ((AbstractApplicationContext)context).refresh()  ==> [org.springframework:spring-context] org.springframework.context.support.AbstractApplicationContext.refresh()
+                    if_registerShutdownHoot context.registerShutdownHook()
+                        [org.springframework:spring-context] AbstractApplicationContext.registerShutdownHook() // Runtime.getRuntime.addShutdownHoot(new Thread = synchronized(startupShutdownHoot))
+                afterRefresh(context, applicationArguments)
+                    callRunners -> 
+                        new Runners().addlAll(context.getBeansOfType([ApplicationRunner.class,CommandLineRunner.class].values))
+                        AnnotationAwareOrderComparator.sort(runners)
+                        foreach -> callRunner(instanceof [ApplicationRunner,CommandLineRunner]) -> runner.run //see CommandLineRunner
+                listeners.finished(context, null)
+                    this.listeners.foreach -> callFinishedListener(listener, context, exception) -> listener.finished(context, exception) // listener:EventPublishingRunListener
+                        SpringApplicationEvent event = getFinishedEvent(context, exception)
+                        context && context.isAlive -> context.publishEvent(event) -[super]-> [org.springframework:spring-context] org.springframework.context.support.AbstractApplicationContext.publishEvent 
+                        else //An inactive context may not have a multicaster so we use our multicaster to call all of the context's listeners instead
+
+

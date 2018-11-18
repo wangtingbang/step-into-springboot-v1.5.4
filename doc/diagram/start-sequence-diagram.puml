@@ -1,0 +1,177 @@
+@startuml
+autonumber
+hide footbox
+title SpringApplication Runner startup sequence diagram
+
+participant Runner
+
+box "Springboot" #LightYellow
+participant SpringApplication
+participant SpringApplicationRunListeners
+participant EventPublishRunListener
+participant AnnotationConfigEmbeddedWebApplicationContext
+participant ApplicationRunner
+participant CommandLineRunner
+end box
+
+box "SpringCore" #LightBlue
+participant SpringFactoriesLoader
+participant AnnotationAwareOrderComparator
+participant DefaultResourceLoader
+participant ClassUtils
+end box
+
+box "SpringContext" #LigthRed
+participant AbstractApplicationContext
+participant GenericApplicationContext
+participant ApplicationContextInitializer
+participant internalConfigurationBeanNameGenerator
+end box
+
+box "SpringContext" #LightGreen
+end box
+
+box "SpringBeans"
+participant DefaultListableBeanFactory
+'participant AbstractApplicationContext
+participant BeanUtils
+end box
+'--------------- box and participant end ------------
+Runner->SpringApplication:run(Runner.class,args)
+
+== 0.initialize ==
+SpringApplication->SpringApplication:set this.source(Set) = sources(SpringApplicationRunner.class)
+SpringApplication->SpringApplication:set this.webEnvironment
+
+== 0.0. SpringApplication->SpringApplication:set initializers ==
+note over SpringApplication
+appCtxInilzer is ApplicationContextInitializer, which defined in META-INF/spring-factories
+end note
+SpringApplication->SpringFactoriesLoader:loanFactoryNames(appCtxInilizer)
+SpringApplication->ClassUtils:forName( app_ctx_inilzer names )
+SpringApplication->BeanUtils:instantiatClass( app_ctx_inilzer names )
+
+== 0.1. SpringApplication->SpringApplication:set listeners ==
+
+note over SpringApplication
+appLstner is ApplicationListener, which defined in META-INF/spring-factories
+end note
+SpringApplication->SpringFactoriesLoader:loanFactoryNames(appLstner)
+SpringApplication->ClassUtils:forName( app_listener names )
+SpringApplication->BeanUtils:instantiatClass( app_listener names )
+SpringApplication->SpringApplication:set mainApplicationClass(stackTrace.methodName.eqauls("main"))
+
+
+== 1.run ==
+SpringApplication->SpringApplication: configureHeadlessProperty
+
+note over SpringApplication
+spAppRunLstner is SpringApplicationRunListenter, which defined in META-INF/spring.factories)
+end note
+SpringApplication->SpringFactoriesLoader:loadFactoryNames(spAppRunLstner)
+SpringApplication->ClassUtils:forName( run listener names )
+SpringApplication->BeanUtils:instantiateClass(run listener names )
+SpringApplication->SpringApplicationRunListeners:starting
+
+== 1.0. prepareEnvironment ==
+note over SpringApplication
+SpringApplication->SpringApplication:prepareEnvironment()
+configurePropertySource:
+    StubPropertySource -> name: servletConfigInitParams, servletContextInitParams
+    MapPropertySource -> name: systemProperties
+    SystemEnvironmentPropertySource -> name: systemEnvironment
+    add
+        is not null defaultProperties
+        addCommandLineProperties && args
+this.webEnvironment ? StandardWebEnvironment : StandardEnvironment
+
+configureProfiles: if environment activeProfiles
+end note
+SpringApplication->SpringApplication:configurePropertySources
+SpringApplication->SpringApplication:configureProfiles -> activeProfiles
+
+SpringApplication->SpringApplication:printBanner
+note over SpringApplication
+contextClass is:
+if(webEnvironment)
+    AnnotationConfigEmbeddedWebApplicationContext
+else
+    AnnotationConfigApplicationContext
+end note
+SpringApplication->SpringApplication:createApplicationContext
+SpringApplication->SpringApplication:init analyzers with failureAnalyzers
+'SpringApplication->SpringApplication:prepareContext
+== 1.1. SpringApplication->SpringApplication:prepareContext ==
+'postProcessApplicationContext
+SpringApplication->DefaultListableBeanFactory: registerSingleton(debug result null)
+SpringApplication->GenericApplicationContext: setResourceLoader(debug not enter)
+SpringApplication->DefaultResourceLoader: setClassLoader(debug not enter)
+note over SpringApplication
+debug get:
+    DelegatingApplicationContextInitializer
+    ContextIdApplicationContextInitializer
+    ConfigurationWarningsApplicationContextInitializer
+    ServerPortInfoApplicationContextInitializer
+    SharedMetadataReaderFactoryContextInitializer
+    AutoConfigurationReportLoggingInitializer
+more than META-INF/spring.factories 
+    ApplicationContextInitializer
+end note
+
+SpringApplication->ApplicationContextInitializer:applyInitializers (foreach t.initialize context)
+
+note over SpringApplication
+listeners = {EventPublishRunListener}
+    which contextPrepared is not implemented
+end note
+SpringApplication->SpringApplication:listenters.contextPrepared(foreach t.contextPrepared context)
+SpringApplication->DefaultListableBeanFactory:registerSingleton
+note over SpringApplication
+load -> reader.load
+reader:
+    AnnotatedBeanDefinitionReader
+    XmlBeanDefinitionReader
+    GroovyBeanDefinitionReader
+    ClassPathBeanDefinitionScanner
+end note
+SpringApplication->SpringApplication:load
+SpringApplication->SpringApplication: listenters.contextLoaded(t.contextLoaded context)
+== prepareContext finished ==
+
+== 1.1. SpringApplication->SpringApplication:refreshContext ==
+note over SpringApplication
+AbstractApplicationContext.refresh:
+  0. Prepare this context for refreshing.
+  1. Tell the subclass to refresh the internal bean factory.
+  2. Prepare the bean factory for use in this context.
+  try
+    3.0 Allows post-processing of the bean factory in context subclasses.
+    3.1 Invoke factory processors registered as beans in the context.
+    3.2 Register bean processors that intercept bean creation.
+    3.3 Initialize message source for this context.
+    3.4 Initialize event multicaster for this context.
+    3.5 Initialize other special beans in specific context subclasses.
+    3.6 Check for listener beans and register them.
+    3.7 Instantiate all remaining (non-lazy-init) singletons.
+    3.8 Last step: publish corresponding event.
+  catch (BeansException ex)
+    4.0 Destroy already created singletons to avoid dangling resources.
+    4.1 Reset 'active' flag.
+    4.2 Propagate exception to caller.
+  finally
+  5. Reset common introspection caches in Spring's core, since we
+    might not ever need metadata for singleton beans anymore...
+end note
+SpringApplication->AbstractApplicationContext:refresh
+SpringApplication->AnnotationConfigEmbeddedWebApplicationContext: registerShutdownHook(which instanceof ConfigurableApplicationContext)
+'SpringApplication->SpringApplication:afterRefresh
+== 1.2. SpringApplication->SpringApplication:afterRefresh ==
+note over SpringApplication
+    foreach(t.run with ARG:
+        args for ApplicationRunner
+        args.getSourceArgs for CommandLineRunner)
+end note
+SpringApplication->ApplicationRunner:run 
+SpringApplication->CommandLineRunner:run 
+SpringApplication->SpringApplicationRunListeners:finished
+@enduml

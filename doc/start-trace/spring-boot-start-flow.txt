@@ -6,8 +6,15 @@ SpringApplication.run(sources, args):
             new SpringApplication(Object... sources)
                 SpringApplication.initialize(sources)
                     sources.addAll(sources)
-                    webEnviroment = deduceWebEnviroment():boolean -> loaded? {javax.servlet.Servlet, org.springframework.web.context.ConfigurableWebApplicationContext}
+                    webEnvironment = deduceWebEnvironment():boolean -> loaded? {javax.servlet.Servlet, org.springframework.web.context.ConfigurableWebApplicationContext}
                     setInitializers(getSpringFactoriesInstances(ApplicationContextInitializer.class))
+                        classLoader = Thread.currentThread.getContextClassLoader() => sun.misc.Launcher$AppClassLoader
+                        names = SpringFactoriesLoader.loanFactoryNames(name, classLoader)
+                            classpath:META-INF/spring.factories
+                        instances = createSpringFactoriesInstances(., ., classLoader, args, names)
+                            [org.springframework:spring-core]       ClassUtils.forName()
+                            [org.springframework:spring-beans]      BeanUtils.instantiateClass(constructor, args)
+                        sort(instances) -> AnnotationAwareOrder
                     setListeners(getSpringFactoriesInstances(ApplicationListener.class))
                     this.mainApplicationClass = deduceMainApplicationClass()
 
@@ -16,24 +23,24 @@ SpringApplication.run(sources, args):
                 (listeners = getRunListeners(args)).starting
                     new SpringApplicationRunListeners
                         getSpringFactoriesInstances(SpringApplicationRunLlistener.class, {SpringApplication.class,String[].class}, this. args)
-                ApplicationArguments applicationArguments = new DefaultApplicatiionArguments(args) -> source = new Source(args), args = args
-                ConfigurableEnviroment enviroment = prepareEnviroment(listeners, applicationArguments)
-                    configureEnviroment(enviroment=getOrCreateEnviroment : this.enviroment || webEnviroment->new StandardServletEnviroment || new StandardEnviroment)
-                        configurePropertySource(enviroment, args)
-                        configureProfiles(enviroment, args)
-                    listeners.enviromentPrepared(enviroment)
-                        foreach -> listener.enviromentPrepared -> [EventPublishingRunListener]initialMulticaster.multicastEvent(new ApplicationEviromentPreparedEvent(application, args, enviroment))
-                        convertToStandardEnviromentIfNesessary(enviroment)
-                printedBanner = printBanner(enviroment)
+                ApplicationArguments applicationArguments = new DefaultApplicationArguments(args) -> source = new Source(args), args = args
+                ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments)
+                    configureEnvironment(environment=getOrCreateEnvironment : this.environment || webEnvironment->new StandardServletEnvironment || new StandardEnvironment)
+                        configurePropertySource(environment, args)
+                        configureProfiles(environment, args)
+                    listeners.environmentPrepared(environment)
+                        foreach -> listener.environmentPrepared -> [EventPublishingRunListener]initialMulticaster.multicastEvent(new ApplicationEviromentPreparedEvent(application, args, environment))
+                        convertToStandardEnvironmentIfNesessary(environment)
+                printedBanner = printBanner(environment)
                 context = createApplicationContext()
-                    Class<?> context = this.applicationContextClass | Class.forName(webEnviroment -> DEFAULT_WEB_CONTEXT_CLASS | DEFAULT_CONTEXT_CLASS)
+                    Class<?> context = this.applicationContextClass | Class.forName(webEnvironment -> DEFAULT_WEB_CONTEXT_CLASS | DEFAULT_CONTEXT_CLASS)
                         DEFAULT_WEB_CONTEXT_CLASS   : org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext
                         DEFAULT_CONTEXT_CLASS       : org.springframework.context.annotation.AnnotationConfigApplicationContext
                     return (ConfigurableWebApplicationContext)BeanUtils.instantiate(context.class)
                         clazz.newInstance()
                 analyzers = new FailureAnalyzers(context)
-                prepareContext(context,enviroment,listeners, applicationArguments,printBanner)
-                    context.setEnviroment(enviroment)
+                prepareContext(context,environment,listeners, applicationArguments,printBanner)
+                    context.setEnvironment(environment)
                     postProcessApplicationContext(context)
                     applyInitializers(context)
                     listeners.contextPrepared(context)

@@ -11,8 +11,9 @@ public class GreetingController {
 
     @Autowired private GreetingService greetingService;
 
+
     @RequestMapping(value = "/hello", method = RequestMethod.GET)
-    public String hello(String name){
+    public String hello(String name) {
         return greetingService.sayHello(name);
     }
 }
